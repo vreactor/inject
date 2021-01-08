@@ -7,13 +7,16 @@ describe('Inject Inversion of Control', function() {
     beforeEach(function() {
         $Inject = new Inject();
 
-        $Inject.register('logging', [function() {
-            return {
-				log: function(message) {
-                    return message;
-                }
-            };
-        }]);
+        $Inject.register({
+			token: 'logging',
+			value: function() {
+				return {
+					log: function(message) {
+						return message;
+					}
+				};
+			}
+		});
     });
 
     it('Given ioc when Inject requested then returns self.', function() {
@@ -35,7 +38,7 @@ describe('Inject Inversion of Control', function() {
                 return Fn;
             })();
 
-            $Inject.register('1', ['logging', fn]);
+            $Inject.register({token: '1', value: fn, deps: ['logging']});
             const actual = $Inject.get('1');
             expect(actual.test()).toBe(expected);
         });
@@ -47,7 +50,7 @@ describe('Inject Inversion of Control', function() {
                 this.test = log.log(expected);
             }
 
-            $Inject.register('2', ['logging', Fn]);
+            $Inject.register({token: '2', value: Fn, deps: ['logging']});
             const actual = $Inject.get('2');
             expect(actual.test).toBe(expected);
         });
@@ -63,7 +66,7 @@ describe('Inject Inversion of Control', function() {
 
             factory.$deps = ['logging'];
 
-            $Inject.register('3', [factory]);
+            $Inject.register({token: '3', value: factory});
             const actual = $Inject.get('3');
             expect(actual.test).toBe(expected);
         });
@@ -71,30 +74,38 @@ describe('Inject Inversion of Control', function() {
 
     describe('Validity checks and contracts', function() {
         it('Given something other than an array passed then it throws an error', function() {
+			const regex = new RegExp(ERROR.ARRAY);
+
             expect(function() {
-                $Inject.register('4', '4');
-            }).toThrowError(ERROR.ARRAY);
+                $Inject.register({token: '4', value: function() {}, deps: '4'});
+            }).toThrowError(regex);
         });
 
         it('Given lst item in array passed is not a function then it throws an error', function() {
+			const regex = new RegExp(ERROR.FUNCTION);
+
             expect(function() {
-                $Inject.register('4', ['4']);
-            }).toThrowError(ERROR.FUNCTION);
+                $Inject.register({token: '4', value: ['4']});
+            }).toThrowError(regex);
         });
 
         it('Given a registration already exists when duplicate registration is attempted then it throws an error', function() {
-            $Inject.register('3', [empty]);
+			const regex = new RegExp(ERROR.REGISTRATION);
+
+            $Inject.register({token: '3', value: empty});
 
             expect(function() {
-                $Inject.register('3', [empty]);
-            }).toThrowError(ERROR.REGISTRATION);
+                $Inject.register({token: '3', value: empty});
+            }).toThrowError(regex);
         });
 
         it('Given recursive dependencies when a dependency is requested then it throws an error', function() {
             const regex = new RegExp(ERROR.RECURSION);
 
-            $Inject.register('depA', ['depB', empty]);
-            $Inject.register('depB', ['depA', empty]);
+            $Inject.register([
+				{token: 'depA', value: empty, deps: ['depB']},
+				{token: 'depB', value: empty, deps: ['depA']},
+			]);
 
             expect(function() {
                 const depA = $Inject.get('depA');
@@ -102,9 +113,11 @@ describe('Inject Inversion of Control', function() {
         });
 
         it('Given get request on service that does not exist then it throws an error', function() {
+			const regex = new RegExp(ERROR.SERVICE);
+
            expect(function() {
                const nothing = $Inject.get('nothing');
-           }).toThrowError(ERROR.SERVICE);
+           }).toThrowError(regex);
         });
     });
 
@@ -128,9 +141,11 @@ describe('Inject Inversion of Control', function() {
         }
 
         beforeEach(function() {
-            $Inject.register('serviceA', [serviceA]);
-            $Inject.register('serviceB', ['serviceA', serviceB]);
-            $Inject.register('serviceC', ['serviceA', serviceC]);
+            $Inject.register([
+				{token: 'serviceA', value: serviceA},
+				{token: 'serviceB', value: serviceB, deps: ['serviceA']},
+				{token: 'serviceC', value: serviceC, deps: ['serviceA']},
+			]);
         });
 
         it('Given registration with proper annotation then returns properly configured instance', function() {
@@ -164,9 +179,11 @@ describe('Inject Inversion of Control', function() {
         ServiceC.$deps = ['ServiceA'];
 
         beforeEach(function() {
-            $Inject.register('ServiceA', [ServiceA]);
-            $Inject.register('ServiceB', [ServiceB]);
-            $Inject.register('ServiceC', [ServiceC]);
+            $Inject.register([
+				{token: 'ServiceA', value: ServiceA},
+				{token: 'ServiceB', value: ServiceB},
+				{token: 'ServiceC', value: ServiceC},
+			]);
         });
 
         it('Given registration with properly annotated function then returns properly configured instance', function() {

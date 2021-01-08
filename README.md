@@ -39,19 +39,18 @@ Create an instance of the container (you may have as many containers as you like
 **Function Annotation:**
 
     ServiceA.$deps = ["dependencyB"]; 
-    $inject.register("serviceA", [ServiceA]);
+    $inject.register({token: "serviceA", value: ServiceA});
 
 **Registration-time Annotation** 
 
-    $inject.register("serviceA", ["dependencyB", ServiceA]);
+    $inject.register({token: "serviceA", value: ServiceA, deps: ["dependencyB"]});
     
 **Retrieving instances** 
     
     const serviceA = $inject.get("serviceA");
     const dependencyB = $inject.get("dependencyB");
 
-Pass a unique name for the instance to the registration function, then an array. The array should either contain the function if the function itself is annotated
-with the special property `$deps`, or a list of named dependencies followed by the function in an array if you want to annotate the dependencies at run-time.
+The registration function can take an array or an object.
 
 See the tests to learn more. 
 

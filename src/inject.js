@@ -3,6 +3,7 @@ export const ERROR = {
 	REGISTRATION: 'Already registered.',
 	ARRAY: 'Must pass array.',
 	FUNCTION: 'Must pass function to invoke.',
+	STRING: 'Must pass string',
 	SERVICE: 'Service does not exist.'
 };
 
@@ -20,7 +21,7 @@ export class Inject {
             return wrapper();
         }
 
-        throw new Error(ERROR.SERVICE);
+        throw new Error(`[${name}] ${ERROR.SERVICE}`);
     }
 
     invoke(fn, deps, instance, name) {
@@ -37,36 +38,47 @@ export class Inject {
         delete this.stack[name];
 
         return fn.apply(instance, args);
-    }
+	}
 
-    register(name, annotatedArray) {
-        if (!Array.isArray(annotatedArray)) {
-            throw new Error(ERROR.ARRAY);
+	registerProvider({token, value, deps = []}) {
+		if (token && typeof token !== 'string') {
+            throw new Error(`token: ${ERROR.STRING}`);
+		}
+
+		if (!token) {
+            token = value.name;
+		}
+
+		if (typeof value !== 'function') {
+            throw new Error(`[${token}] value: ${ERROR.FUNCTION}`);
+		}
+
+        if (!Array.isArray(deps)) {
+            throw new Error(`[${token}] deps: ${ERROR.ARRAY}`);
+		}
+
+        if (this.container[token]) {
+            throw new Error(`${token}] ${ERROR.REGISTRATION}`);
         }
 
-        if (this.container[name]) {
-            throw new Error(ERROR.REGISTRATION);
-        }
-
-        if (typeof annotatedArray[annotatedArray.length - 1] !== 'function') {
-            throw new Error(ERROR.FUNCTION);
-        }
-
-        this.container[name] = () => {
-            let result = {};
+        this.container[token] = () => {
             const Template = function() {};
-            const fn = annotatedArray[annotatedArray.length - 1];
-            const deps = annotatedArray.length === 1 ? (annotatedArray[0].$deps || []) : annotatedArray.slice(0, annotatedArray.length - 1);
+            const _deps = !deps.length ? (value.$deps || []) : deps;
+            let result = {};
 
-            Template.prototype = fn.prototype;
+            Template.prototype = value.prototype;
 
             const instance = new Template();
-            const injected = this.invoke(fn, deps, instance, name);
+            const injected = this.invoke(value, _deps, instance, token);
 
             result = injected || instance;
-            this.container[name] = () => result;
+            this.container[token] = () => result;
 
             return result;
         };
+    }
+
+    register(provider) {
+		Array.isArray(provider) ? provider.forEach(provide => this.registerProvider(provide)) : this.registerProvider(provider);
     }
 }
